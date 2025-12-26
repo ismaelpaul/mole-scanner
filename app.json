@@ -19,7 +19,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.ismafp.molescannermobile"
     },
     "web": {
       "output": "static",
@@ -38,11 +39,19 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-font",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "a6fd7de7-a5d1-436c-bd9a-c2b8ff484c1f"
+      }
     }
   }
 }
