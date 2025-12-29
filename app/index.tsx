@@ -1,15 +1,21 @@
-import { Text, View } from "react-native";
+import { useFirstTimeOpen } from '@/hooks/useFirstTimeOpen';
+import { Redirect } from 'expo-router';
+import { ActivityIndicator, View } from 'react-native';
 
 export default function Index() {
-  return (
-    <View
-      style={{
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
-      }}
-    >
-      <Text>Edit app/index.tsx to edit this screen.</Text>
-    </View>
-  );
+	const { isFirstTime, isLoading } = useFirstTimeOpen();
+
+	if (isLoading) {
+		return (
+			<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+				<ActivityIndicator />
+			</View>
+		);
+	}
+
+	if (isFirstTime) {
+		return <Redirect href="/onboarding" />;
+	}
+
+	return <Redirect href="/(tabs)/history" />;
 }
