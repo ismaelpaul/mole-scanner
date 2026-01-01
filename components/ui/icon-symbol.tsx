@@ -24,6 +24,9 @@ const MAPPING = {
 	'clock.fill': 'history',
 	'qrcode.viewfinder': 'qr-code-scanner',
 	'person.fill': 'person',
+	'leaf.fill': 'eco',
+	'face.smiling.fill': 'face',
+	'bell.fill': 'notifications',
 } as IconMapping;
 
 /**
