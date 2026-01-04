@@ -1,14 +1,25 @@
+import { useThemeColor } from '@/hooks/useThemeColor';
 import { StyleSheet, Text, type TextProps } from 'react-native';
 
 export type ThemedTextProps = TextProps & {
 	type?: 'default' | 'title' | 'defaultSemiBold' | 'subtitle' | 'link';
+	color?: keyof typeof textColorMap;
 };
+
+const textColorMap = {
+	primary: 'textPrimary',
+	secondary: 'textSecondary',
+	muted: 'textMuted',
+	link: 'textLink',
+} as const;
 
 export function ThemedText({
 	style,
 	type = 'default',
+	color = 'primary',
 	...rest
 }: ThemedTextProps) {
+	const textColor = useThemeColor({}, textColorMap[color]);
 	return (
 		<Text
 			style={[
@@ -17,6 +28,7 @@ export function ThemedText({
 				type === 'defaultSemiBold' ? styles.defaultSemiBold : undefined,
 				type === 'subtitle' ? styles.subtitle : undefined,
 				type === 'link' ? styles.link : undefined,
+				{ color: textColor },
 				style,
 			]}
 			{...rest}
