@@ -1,67 +1,62 @@
-import React, { useRef, useState } from 'react';
-import {
-	ActivityIndicator,
-	Alert,
-	StyleSheet,
-	TouchableOpacity,
-	View,
-} from 'react-native';
+import { useIsFocused } from '@react-navigation/native';
+import * as Haptics from 'expo-haptics';
+import { useRouter } from 'expo-router';
+import React, { useCallback, useRef, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
 import { Camera, useCameraDevice } from 'react-native-vision-camera';
+import BottomCameraTools from './BottomCameraTools';
+import { ScannerOverlay } from './ScannerOverlay';
 import { ThemedText } from './ThemedText';
+import { useTorchControl } from '@/hooks/useTorchControl';
+import { useMoleScanner } from '@/hooks/useMoleScanner';
+import { captureAndCropMoleImage } from '@/utils/ImageProcessorUtils';
 
 export default function ScanCamera() {
 	const device = useCameraDevice('back');
 	const camera = useRef<Camera>(null);
+	const isFocused = useIsFocused();
+
+	const router = useRouter();
+
 	const [isCapturing, setIsCapturing] = useState(false);
+	const [isCameraReady, setIsCameraReady] = useState(false);
+
+	const torchEnabled = useTorchControl(isFocused, isCameraReady);
+
+	const onInitialized = useCallback(() => setIsCameraReady(true), []);
+
+	// Use the mole scanner hook for frame processing
+	const { frameProcessor, frameDimensions, status } = useMoleScanner({
+		onHapticFeedback: () => {
+			Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+		},
+	});
 
 	const takePhoto = async () => {
-		if (!camera.current) return;
+		if (!camera.current || isCapturing || !frameDimensions) return;
 
 		try {
 			setIsCapturing(true);
-			const photo = await camera.current.takePhoto({
-				flash: 'auto',
-				enableShutterSound: true,
+
+			const uri = await captureAndCropMoleImage(camera.current, {
+				frameDimensions,
 			});
 
-			console.log('Photo captured:', photo.path);
-
-			uploadPhoto(photo.path);
-
-			Alert.alert('Success', 'Photo captured! Path: ' + photo.path);
+			router.push({
+				pathname: '/ReviewPhoto',
+				params: { uri },
+			});
 		} catch (e) {
-			Alert.alert('Error', 'Failed to take photo');
-			console.error(e);
+			console.error('Capture and Crop Failed:', e);
 		} finally {
 			setIsCapturing(false);
-		}
-	};
-
-	const uploadPhoto = async (filePath: string) => {
-		const formData = new FormData();
-		formData.append('file', {
-			uri: 'file://' + filePath,
-			type: 'image/jpeg',
-			name: 'mole_scan.jpg',
-		} as any);
-
-		try {
-			const response = await fetch('SERVER_URL/upload', {
-				method: 'POST',
-				body: formData,
-				headers: { 'Content-Type': 'multipart/form-data' },
-			});
-			const result = await response.json();
-			console.log('Upload success:', result);
-		} catch (error) {
-			console.error('Upload failed:', error);
 		}
 	};
 
 	if (!device)
 		return (
 			<View style={styles.container}>
-				<ThemedText>Loading Camera...</ThemedText>
+				<ThemedText>Loading...</ThemedText>
 			</View>
 		);
 
@@ -71,28 +66,24 @@ export default function ScanCamera() {
 				ref={camera}
 				style={StyleSheet.absoluteFill}
 				device={device}
-				isActive={true}
+				isActive={isFocused}
 				photo={true}
+				onInitialized={onInitialized}
+				torch={torchEnabled ? 'on' : 'off'}
+				frameProcessor={frameProcessor}
 			/>
 
-			<View style={styles.overlayCircle} />
+			<ScannerOverlay
+				isReady={status.ready}
+				captureProgress={status.captureProgress}
+			/>
 
-			<View style={styles.bottomBar}>
-				<TouchableOpacity
-					style={styles.captureButton}
-					onPress={takePhoto}
-					disabled={isCapturing}
-				>
-					{isCapturing ? (
-						<ActivityIndicator color="black" />
-					) : (
-						<View style={styles.captureInternal} />
-					)}
-				</TouchableOpacity>
-				<ThemedText style={styles.hintText}>
-					Center the mole inside the circle
-				</ThemedText>
-			</View>
+			<BottomCameraTools
+				isReady={status.ready}
+				isCapturing={isCapturing}
+				score={status.score}
+				onCapture={takePhoto}
+			/>
 		</View>
 	);
 }
@@ -104,40 +95,4 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		backgroundColor: 'black',
 	},
-	overlayCircle: {
-		position: 'absolute',
-		top: '40%',
-		left: '50%',
-		width: 220,
-		height: 220,
-		marginLeft: -110,
-		marginTop: -110,
-		borderRadius: 110,
-		borderWidth: 2,
-		borderColor: 'white',
-		borderStyle: 'dashed',
-	},
-	bottomBar: {
-		position: 'absolute',
-		bottom: 50,
-		width: '100%',
-		alignItems: 'center',
-	},
-	captureButton: {
-		width: 80,
-		height: 80,
-		borderRadius: 40,
-		backgroundColor: 'white',
-		justifyContent: 'center',
-		alignItems: 'center',
-		marginBottom: 20,
-	},
-	captureInternal: {
-		width: 66,
-		height: 66,
-		borderRadius: 33,
-		borderWidth: 4,
-		borderColor: 'black',
-	},
-	hintText: { color: 'white', fontSize: 14, opacity: 0.8 },
 });
