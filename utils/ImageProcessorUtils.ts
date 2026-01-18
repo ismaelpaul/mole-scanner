@@ -1,6 +1,6 @@
+import { SCANNER_CONFIG } from '@/constants/ScannerConstants';
 import * as ImageManipulator from 'expo-image-manipulator';
 import type { Camera } from 'react-native-vision-camera';
-import { SCANNER_CONFIG } from '@/constants/ScannerConstants';
 
 export interface CropParams {
 	frameDimensions: { width: number; height: number };
@@ -37,38 +37,48 @@ export async function captureAndCropMoleImage(
 		outputSize = SCANNER_CONFIG.CROP.OUTPUT_SIZE,
 	} = params;
 
-	// 1. TAKE PHOTO
+	// TAKE PHOTO
 	const photo = await camera.takePhoto({ flash: 'off' });
 
-	// 2. ROTATE TO MATCH SCREEN
-	// This "bakes in" the orientation so pW/pH match what you see on screen.
-	const fixedOrientation = await ImageManipulator.manipulateAsync(
+	//  DETERMINE ROTATION AND MIRRORING
+	let rotation = 0;
+	const orientation = photo.orientation;
+
+	if (orientation === 'landscape-left') rotation = -90;
+	if (orientation === 'landscape-right') rotation = 90;
+	if (orientation === 'portrait-upside-down') rotation = 180;
+
+	// Build the transformations array
+	const actions: ImageManipulator.Action[] = [];
+
+	if (rotation !== 0) {
+		actions.push({ rotate: rotation });
+	}
+
+	// FIX IMAGE ORIENTATION (Bake in rotation and flips)
+	const fixedImageOrientation = await ImageManipulator.manipulateAsync(
 		`file://${photo.path}`,
-		[],
+		actions,
 		{ format: ImageManipulator.SaveFormat.JPEG },
 	);
 
-	const pW = fixedOrientation.width;
-	const pH = fixedOrientation.height;
+	const pW = fixedImageOrientation.width;
+	const pH = fixedImageOrientation.height;
 
-	// 3. CALCULATE SCALE USING FRAME DIMENSIONS
+	// CALCULATE SCALE
 	const scaleX = pW / frameDimensions.width;
 	const scaleY = pH / frameDimensions.height;
-
-	// Use scaleX for crop size (horizontal dimension)
 	const cropSize = Math.floor(circleSize * scaleX * scaleFactor);
 
-	// 4. MAP THE CENTER
+	// MAP THE CENTER
 	const originX = Math.floor((pW - cropSize) / 2);
-	// We use scaleY to map vertical position from frame to photo
 	const originY = Math.floor(
 		frameDimensions.height * verticalPosition * scaleY - cropSize / 2,
 	);
 
-	// 5. CROP & UPSCALING
-	// We resize to outputSize x outputSize so the final photo is high resolution.
+	// CROP & UPSCALING
 	const result = await ImageManipulator.manipulateAsync(
-		fixedOrientation.uri,
+		fixedImageOrientation.uri,
 		[
 			{
 				crop: {
